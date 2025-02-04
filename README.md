@@ -21,10 +21,7 @@ Just search.
 - No hidden agendas.  
 - Just a search engine.  
 
-#### **Because search should be simple.**  
-#### **Because privacy should be the default.**  
-
 **This. Now.**  
-A search engine the way it was meant to be.  
+Because search should be simple.
 
 **Try it. Feel the difference.**  
