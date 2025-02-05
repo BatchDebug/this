@@ -20,6 +20,8 @@ Just search.
 - No secret partnerships.  
 - No hidden agendas.  
 - Just a search engine.  
+### 📸 **Screenshots**
+![grafik](https://github.com/user-attachments/assets/240c2cba-70d9-402c-838d-a08808b1785c)
 
 **This. Now.**  
 Because search should be simple.
