@@ -8,7 +8,7 @@ Just search.
 
 ### 🔍 **Privacy First**  
 - We don’t track you.  
-- We don’t store your searches.  
+- We don’t store your searches.  (Unless you enable "Remember Recent Searches")
 - We don’t build profiles on you.  
 
 ### 🚀 **Fast & Focused**  
