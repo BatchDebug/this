@@ -688,51 +688,34 @@ class SearchEngine {
           
           <div class="feature-grid">
             <div class="feature-item">
-              <svg viewBox="0 0 24 24" class="feature-icon">
-                <path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.78 4.21,10.21L9,15V16A2,2 0 0,0 11,18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"/>
-              </svg>
               <h3>Lightning Fast Search</h3>
               <p>Instant results from multiple trusted sources</p>
             </div>
             
             <div class="feature-item">
-              <svg viewBox="0 0 24 24" class="feature-icon">
-                <path d="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z"/>
-              </svg>
               <h3>Smart Ranking</h3>
               <p>Intelligent results ranking based on relevance</p>
             </div>
             
             <div class="feature-item">
-              <svg viewBox="0 0 24 24" class="feature-icon">
-                <path d="M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z"/>
-              </svg>
               <h3>Privacy Focused</h3>
               <p>No tracking, no data collection, just search</p>
             </div>
             
             <div class="feature-item">
-              <svg viewBox="0 0 24 24" class="feature-icon">
-                <path d="M20,3H4A1,1 0 0,0 3,4V10A1,1 0 0,0 4,11H20A1,1 0 0,0 21,10V4A1,1 0 0,0 20,3M20,13H4A1,1 0 0,0 3,14V20A1,1 0 0,0 4,21H20A1,1 0 0,0 21,20V14A1,1 0 0,0 20,13Z"/>
-              </svg>
               <h3>Dark Mode</h3>
               <p>Easy on the eyes with automatic theme switching</p>
             </div>
             
             <div class="feature-item">
-              <svg viewBox="0 0 24 24" class="feature-icon">
-                <path d="M17.9,17.39C17.64,16.59 16.89,16 16,16H15V13A1,1 0 0,0 14,12H8V10H10A1,1 0 0,0 11,9V7H13A2,2 0 0,0 15,5V4.59C17.93,5.77 20,8.64 20,12C20,14.08 19.2,15.97 17.9,17.39M11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.78 4.21,10.21L9,15V16A2,2 0 0,0 11,18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"/>
-            </svg>
-            <h3>Global Search</h3>
-            <p>Results from multiple sources worldwide</p>
-          </div>
+              <h3>Global Search</h3>
+              <p>Results from multiple sources worldwide</p>
+            </div>
           
-          <div class="feature-item">
-            <svg viewBox="0 0 24 24" class="feature-icon">
-              <path d="M3,3H21V5H3V3M3,7H21V9H3V7M3,11H21V13H3V11M3,15H21V17H3V15M3,19H21V21H3V19Z"/>
-            </svg>
-            <h3>Customizable Settings</h3>
-            <p>Personalize your search experience</p>
+            <div class="feature-item">
+              <h3>Customizable Settings</h3>
+              <p>Personalize your search experience</p>
+            </div>
           </div>
         </div>
         
