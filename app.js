@@ -7,6 +7,13 @@ class SearchEngine {
       return;
     }
     
+    document.body.className = `${this.settings.darkMode ? 'dark-mode' : ''} bg-${this.settings.background}`;
+    if (this.settings.background === 'custom' && this.settings.customBackground) {
+      document.body.style.background = `${this.settings.darkMode ? '#121212' : '#f5f5f5'} url(${this.settings.customBackground}) center/cover fixed no-repeat`;
+    } else {
+      document.body.style.background = '';
+    }
+    
     this.searchInput = document.getElementById('searchInput');
     this.searchButton = document.getElementById('searchButton');
     this.resultsContainer = document.getElementById('resultsContainer');
@@ -69,7 +76,7 @@ class SearchEngine {
   }
 
   async performSearch(page = 1) {
-    const query = this.searchInput.value.trim();
+    const query = this.searchInput.value.trim().toLowerCase(); // Convert to lowercase here
     if (!query) return;
 
     this.saveRecentSearch(query);
@@ -94,14 +101,6 @@ class SearchEngine {
     this.isLoading = true;
 
     try {
-      const cacheKey = `${query}-${page}`;
-      if (this.cache.has(cacheKey)) {
-        this.currentResults = this.cache.get(cacheKey);
-        this.totalResults = this.currentResults.length;
-        this.displayResults();
-        return;
-      }
-
       const results = await Promise.all([
         this.fetchDomainMatch(query),
         this.fetchWithTimeout(this.fetchFromWikipedia(query), 800),
@@ -116,17 +115,14 @@ class SearchEngine {
       const processedResults = await Promise.all(
         results.flat()
           .filter(Boolean)
-          .map(async result => ({
-            ...result,
-            description: result.description || 'This website has no description.'
-          }))
+          .map(result => this.processSearchResult(result))
       );
 
       const rankedResults = this.limitResultsPerDomain(
         this.rankResults(query, processedResults)
       );
 
-      this.cache.set(cacheKey, rankedResults);
+      this.cache.set(`${query}-${page}`, rankedResults);
       
       if (this.cache.size > 20) {
         const firstKey = this.cache.keys().next().value;
@@ -315,33 +311,105 @@ class SearchEngine {
     const startsWith = new RegExp(`^${query}`, 'i');
     const containsExact = new RegExp(`\\b${query}\\b`, 'i');
     
+    // Enhanced semantic scoring
+    const semanticWeights = {
+      'search': ['find', 'lookup', 'query', 'explore', 'discover'],
+      'download': ['install', 'get', 'obtain', 'acquire', 'fetch'],
+      'video': ['watch', 'stream', 'movie', 'film', 'youtube', 'vimeo'],
+      'music': ['listen', 'song', 'audio', 'spotify', 'soundcloud'],
+      'shop': ['buy', 'purchase', 'store', 'amazon', 'ebay'],
+      'news': ['article', 'blog', 'post', 'update', 'latest'],
+      'learn': ['tutorial', 'guide', 'course', 'education', 'training'],
+      'social': ['network', 'community', 'connect', 'share', 'facebook', 'twitter'],
+      'code': ['programming', 'developer', 'software', 'github', 'gitlab'],
+      'image': ['picture', 'photo', 'graphic', 'instagram', 'flickr'],
+      'game': ['play', 'gaming', 'steam', 'xbox', 'playstation'],
+      'book': ['read', 'ebook', 'kindle', 'literature', 'novel'],
+      'travel': ['flight', 'hotel', 'vacation', 'booking', 'trip'],
+      'food': ['recipe', 'restaurant', 'cooking', 'menu', 'meal'],
+      'health': ['medical', 'fitness', 'exercise', 'wellness', 'doctor']
+    };
+
     return results
       .map(result => {
         let score = result.relevance || 0;
-        const domain = this.extractDomain(result.url);
+        const domain = this.extractDomain(result.url).toLowerCase();
         const title = result.title.toLowerCase();
-        const description = (result.description || '').toLowerCase();
+        const description = (result.description || 'This website has no description').toLowerCase();
+        const url = result.url.toLowerCase();
 
-        if (exactMatch.test(domain)) score += 2000;
-        if (exactMatch.test(title)) score += 1500;
-        if (startsWith.test(domain)) score += 1000;
-        if (startsWith.test(title)) score += 800;
-        if (containsExact.test(title)) score += 600;
+        // Exact domain matches get highest priority
+        if (exactMatch.test(domain)) score += 8000;
+        if (startsWith.test(domain)) score += 6000;
+        if (domain.includes(query)) score += 5000;
+
+        // Title relevance
+        if (exactMatch.test(title)) score += 7000;
+        if (startsWith.test(title)) score += 5000;
+        if (containsExact.test(title)) score += 4000;
+
+        // URL path relevance
+        if (url.includes(query)) score += 3000;
         
-        const matches = (title + ' ' + description).match(queryRegex) || [];
-        score += matches.length * 50;
+        // Enhanced term proximity scoring
+        const content = `${title} ${description}`;
+        const words = content.split(/\s+/);
+        let proximityScore = 0;
+        
+        queryTerms.forEach((term, i) => {
+          const termIndex = words.findIndex(w => w.includes(term));
+          if (termIndex !== -1) {
+            queryTerms.forEach((otherTerm, j) => {
+              if (i !== j) {
+                const otherIndex = words.findIndex(w => w.includes(otherTerm));
+                if (otherIndex !== -1) {
+                  proximityScore += 1000 / (1 + Math.abs(termIndex - otherIndex));
+                }
+              }
+            });
+          }
+        });
+        
+        score += proximityScore;
 
-        if (domain.includes(query.toLowerCase())) {
-          score += 1500;
-          if (domain.endsWith('.com')) score += 200;
-        }
+        // Enhanced semantic relevance
+        Object.entries(semanticWeights).forEach(([category, related]) => {
+          if (queryTerms.some(term => term === category || related.includes(term))) {
+            if (title.includes(category) || description.includes(category)) score += 2000;
+            related.forEach(term => {
+              if (title.includes(term)) score += 1500;
+              if (description.includes(term)) score += 1000;
+              if (domain.includes(term)) score += 800;
+            });
+          }
+        });
 
-        if (title.length > 100) score -= 100;
-        if (description.length > 300) score -= 50;
+        // Popular TLD boost
+        if (domain.endsWith('.com')) score += 800;
+        if (domain.endsWith('.org')) score += 600;
+        if (domain.endsWith('.edu')) score += 700;
+        if (domain.endsWith('.gov')) score += 700;
+        if (domain.endsWith('.net')) score += 500;
+
+        // Word order matching
+        const queryPhrase = query.toLowerCase();
+        if (title.includes(queryPhrase)) score += 3500;
+        if (description.includes(queryPhrase)) score += 2500;
+
+        // Length penalties
+        if (title.length > 100) score -= Math.floor((title.length - 100) / 10);
+        if (description.length > 300) score -= Math.floor((description.length - 300) / 20);
 
         return { ...result, score };
       })
       .sort((a, b) => b.score - a.score);
+  }
+
+  processSearchResult(result) {
+    return {
+      ...result,
+      description: result.description || 'This website has no description'
+    };
   }
 
   async getFavicon(url) {
@@ -440,7 +508,7 @@ class SearchEngine {
       github: '<svg class="source-icon github" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12S17.52 2 12 2z"/></svg>',
       qwant: '<svg class="source-icon qwant" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>',
       brave: '<svg class="source-icon brave" viewBox="0 0 24 24"><path d="M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.333L20 8v8l-8 4-8-4V8l8-3.667V4.333z"/></svg>',
-      stackoverflow: '<svg class="source-icon stackoverflow" viewBox="0 0 24 24"><path d="M12,18C11.11,18 10.26,17.8 9.5,17.45C11.56,16.5 13,14.42 13,12C13,9.58 11.56,7.5 9.5,6.55C10.26,6.2 11.11,6 12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18M20,8.69V4H15.31L12,0.69L8.69,4H4V8.69L0.69,12L4,15.31V20H8.69L12,23.31L15.31,20H20V15.31L23.31,12L20,8.69Z"/></svg>',
+      stackoverflow: '<svg class="source-icon stackoverflow" viewBox="0 0 24 24"><path d="M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3"/></svg>',
       reddit: '<svg class="source-icon reddit" viewBox="0 0 24 24"><path d="M17.9,17.39C17.64,16.59 16.89,16 16,16H15V13A1,1 0 0,0 14,12H8V10H10A1,1 0 0,0 11,9V7H13A2,2 0 0,0 15,5V4.59C17.93,5.77 20,8.64 20,12C20,14.08 19.2,15.97 17.9,17.39M11,19.93C7.05,19.44 4,16.08 4,12C4,11.38 4.08,10.78 4.21,10.21L9,15V16A2,2 0 0,0 11,18M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"/></svg>',
       bing: '<svg class="source-icon bing" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>'
     };
@@ -462,7 +530,9 @@ class SearchEngine {
       enableAnimations: true,
       instantSearch: false,
       autoFocus: true,
-      rememberSearches: false
+      rememberSearches: false,
+      background: 'plain',
+      customBackground: null
     };
     
     const savedSettings = localStorage.getItem('searchSettings');
@@ -528,12 +598,44 @@ class SearchEngine {
               <option value="30" ${this.settings.resultsPerPage === 30 ? 'selected' : ''}>30</option>
             </select>
           </div>
+          <div class="setting-item">
+            <label>Background Style</label>
+            <select data-setting="background">
+              <option value="plain" ${this.settings.background === 'plain' ? 'selected' : ''}>Plain</option>
+              <option value="custom" ${this.settings.background === 'custom' ? 'selected' : ''}>Custom Image <span class="beta-tag">Beta</span></option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <label>Custom Background</label>
+            <label class="custom-file-upload">
+              <input type="file" accept="image/*" id="backgroundUpload">
+              Choose Image
+            </label>
+          </div>
         </div>
         <button class="close-settings">Close</button>
       </div>
     `;
 
     document.body.appendChild(modal);
+
+    const fileInput = modal.querySelector('#backgroundUpload');
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          this.settings.customBackground = e.target.result;
+          this.settings.background = 'custom';
+          this.saveSettings();
+          this.applyBackground();
+          
+          const backgroundSelect = modal.querySelector('select[data-setting="background"]');
+          backgroundSelect.value = 'custom';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
 
     modal.querySelector('.close-settings').addEventListener('click', () => {
       modal.remove();
@@ -553,12 +655,67 @@ class SearchEngine {
       });
     });
 
-    modal.querySelector('select').addEventListener('change', (e) => {
-      this.settings.resultsPerPage = parseInt(e.target.value);
-      this.saveSettings();
-      this.resultsPerPage = this.settings.resultsPerPage;
-      this.displayResults();
+    modal.querySelectorAll('select').forEach(select => {
+      select.addEventListener('change', (e) => {
+        this.settings[e.target.dataset.setting] = 
+          e.target.dataset.setting === 'resultsPerPage' ? 
+            parseInt(e.target.value) : e.target.value;
+        this.saveSettings();
+        
+        if (e.target.dataset.setting === 'background') {
+          this.applyBackground();
+        } else if (e.target.dataset.setting === 'resultsPerPage') {
+          this.resultsPerPage = this.settings.resultsPerPage;
+          this.displayResults();
+        }
+      });
     });
+  }
+
+  applyBackground() {
+    document.body.className = `${this.settings.darkMode ? 'dark-mode' : ''} bg-${this.settings.background}`;
+    
+    if (this.settings.background === 'custom' && this.settings.customBackground) {
+      document.body.style.background = '';
+      const style = document.createElement('style');
+      style.textContent = `
+        body.bg-custom::before {
+          background-image: url(${this.settings.customBackground});
+        }
+      `;
+      const existingStyle = document.querySelector('style[data-custom-bg]');
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+      style.setAttribute('data-custom-bg', 'true');
+      document.head.appendChild(style);
+    } else {
+      const existingStyle = document.querySelector('style[data-custom-bg]');
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+      document.body.style.background = '';
+    }
+  }
+
+  toggleTheme() {
+    this.settings.darkMode = !this.settings.darkMode;
+    this.saveSettings();
+    this.applyBackground();
+  }
+
+  initializeTheme() {
+    this.applyBackground();
+    
+    const themeToggle = document.createElement('button');
+    themeToggle.className = 'theme-toggle';
+    themeToggle.innerHTML = `
+      <svg viewBox="0 0 24 24">
+        <path d="M12,18C11.11,18 10.26,17.8 9.5,17.45C11.56,16.5 13,14.42 13,12C13,9.58 11.56,7.5 9.5,6.55C10.26,6.2 11.11,6 12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18M20,8.69V4H15.31L12,0.69L8.69,4H4V8.69L0.69,12L4,15.31V20H8.69L12,23.31L15.31,20H20V15.31L23.31,12L20,8.69Z"/>
+      </svg>
+    `;
+    themeToggle.addEventListener('click', () => this.toggleTheme());
+    document.body.appendChild(themeToggle);
   }
 
   setupEventListeners() {
@@ -569,7 +726,6 @@ class SearchEngine {
       }
     });
 
-    // Add global keypress listener for auto-focus
     document.addEventListener('keypress', (e) => {
       if (
         document.activeElement !== this.searchInput && 
@@ -579,7 +735,7 @@ class SearchEngine {
         !e.metaKey
       ) {
         this.searchInput.focus();
-        if (!e.key.match(/[\x00-\x1F\x7F]/)) {  // Ignore control characters
+        if (!e.key.match(/[\x00-\x1F\x7F]/)) {  
           this.searchInput.value = e.key;
         }
       }
@@ -589,7 +745,7 @@ class SearchEngine {
     settingsButton.className = 'settings-button';
     settingsButton.innerHTML = `
       <svg viewBox="0 0 24 24">
-        <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
+        <path d="M19.14,12.94c.04-.3.06-.61.06-.94c0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24,0-.43.17-.47.41l-.36,2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47,0-.59.22L2.74,8.87c-.12.21-.08.47.12.61l2.03,1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03,1.58c-.18.14-.23.41-.12.61l1.92,3.32c.12.22.37.29.59.22l2.39-.96c.5.38,1.03.7,1.62.94l.36,2.54c.05.24.24.41.48.41h3.84c.24,0,.44-.17.47-.41l.36-2.54c.59-.24,1.13-.56,1.62-.94l2.39.96c.22.08.47,0,.59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6s-1.62,3.6-3.6,3.6z"/>
       </svg>
     `;
     settingsButton.addEventListener('click', () => this.showSettingsModal());
@@ -643,29 +799,6 @@ class SearchEngine {
     });
 
     this.searchInput.parentElement.appendChild(suggestionsDiv);
-  }
-
-  initializeTheme() {
-    const darkMode = this.settings.darkMode;
-    if (darkMode) {
-      document.body.classList.add('dark-mode');
-    }
-    
-    const themeToggle = document.createElement('button');
-    themeToggle.className = 'theme-toggle';
-    themeToggle.innerHTML = `
-      <svg viewBox="0 0 24 24">
-        <path d="M12,18C11.11,18 10.26,17.8 9.5,17.45C11.56,16.5 13,14.42 13,12C13,9.58 11.56,7.5 9.5,6.55C10.26,6.2 11.11,6 12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18M20,8.69V4H15.31L12,0.69L8.69,4H4V8.69L0.69,12L4,15.31V20H8.69L12,23.31L15.31,20H20V15.31L23.31,12L20,8.69Z"/>
-      </svg>
-    `;
-    themeToggle.addEventListener('click', () => this.toggleTheme());
-    document.body.appendChild(themeToggle);
-  }
-
-  toggleTheme() {
-    this.settings.darkMode = !this.settings.darkMode;
-    this.saveSettings();
-    document.body.classList.toggle('dark-mode', this.settings.darkMode);
   }
 
   showLandingPage() {
@@ -723,10 +856,7 @@ class SearchEngine {
       </div>
     `;
 
-    const darkMode = this.settings.darkMode;
-    if (darkMode) {
-      document.body.classList.add('dark-mode');
-    }
+    document.body.className = `${this.settings.darkMode ? 'dark-mode' : ''} bg-${this.settings.background}`;
 
     document.querySelector('.theme-toggle').addEventListener('click', () => {
       const isDarkMode = document.body.classList.toggle('dark-mode');
