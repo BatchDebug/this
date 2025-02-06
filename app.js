@@ -156,7 +156,10 @@ class SearchEngine {
       .replace(/[^a-z0-9]/g, '')
       .replace(/\s+/g, '');
     
-    const tlds = ['com', 'net', 'org', 'io', 'app', 'dev'];
+    const tlds = ['com', 'net', 'org', 'io', 'app', 'dev', 'ai', 'co',
+      'me', 'info', 'biz', 'edu', 'gov', 'int', 'mil',
+      'name', 'pro', 'aero', 'asia', 'cat', 'coop', 'jobs',
+      'mobi', 'museum', 'tel', 'travel', 'xyz', 'tech', 'de', 'co.uk'];
     
     const results = await Promise.all(tlds.map(async tld => {
       const domain = `${cleanQuery}.${tld}`;
